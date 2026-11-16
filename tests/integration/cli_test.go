@@ -66,11 +66,11 @@ func TestCLIWorkflow(t *testing.T) {
 
 func TestCLIRecoversFromInputErrors(t *testing.T) {
 	input := strings.Join([]string{
-		"11", "unknown", "2", "4", // selection required, unknown command, empty lists
+		"11", "unknown", "2", "4", // Нет выбранной формы, неизвестная команда, пустые списки.
 		"1", "Alice", "2", "bad", "2", "99", "2", "1",
-		"3", "Invalid", "zero", // invalid integer
+		"3", "Invalid", "zero", // Введено не число.
 		"3", "Course", "1", "Exam", "10", "100",
-		"6", "8", "1", "11", "", // score above maximum
+		"6", "8", "1", "11", "", // Балл выше максимума.
 		"8", "1", "7,5", "", "9", "11", "0",
 	}, "\n") + "\n"
 	var output bytes.Buffer
@@ -161,7 +161,7 @@ func TestCLIEditKeepsExistingValues(t *testing.T) {
 func TestCLIRubricBuilderRetriesOnlyRejectedCriterion(t *testing.T) {
 	input := strings.Join([]string{
 		"3", "Course", "2", "Exam", "10", "40",
-		"Project", "20", "70", // exceeds the remaining weight; retry this step
+		"Project", "20", "70", // Сумма весов больше 100: повторяем ввод критерия.
 		"Project", "20", "60", "0",
 	}, "\n") + "\n"
 	var output bytes.Buffer

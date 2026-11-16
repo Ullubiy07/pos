@@ -16,8 +16,7 @@ var _ application.ResultExporter = (*ResultExporter)(nil)
 
 func NewResultExporter() *ResultExporter { return &ResultExporter{} }
 
-// Export writes one CSV document with a header and one student's result.
-// The caller owns the destination and is responsible for closing it if needed.
+// Записывает заголовок и одну строку. Открытие и закрытие файла — на стороне вызывающего кода.
 func (e *ResultExporter) Export(ctx context.Context, result application.StudentResult, destination io.Writer) error {
 	if err := ctx.Err(); err != nil {
 		return err

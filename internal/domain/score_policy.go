@@ -2,7 +2,6 @@ package domain
 
 import "math"
 
-// ScorePolicy chooses the final-score rounding rule, shared by display and export.
 type ScorePolicy interface {
 	Apply(Score) (Score, error)
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Repository implementations must preserve these errors for errors.Is checks.
+// Адаптеры возвращают эти ошибки напрямую или оборачивают через %w.
 var (
 	ErrNotFound      = errors.New("not found")
 	ErrAlreadyExists = errors.New("already exists")
@@ -22,25 +22,22 @@ type StudentRepository interface {
 	List(context.Context) ([]domain.Student, error)
 }
 
-// Rubrics are stored as a whole, including all of their criteria.
-// Add rejects an existing ID; criterion names are unique within each rubric.
+// Рубрикатор хранится целиком с критериями. Повторный ID — ErrAlreadyExists.
 type RubricRepository interface {
 	Add(context.Context, domain.Rubric) error
 	Get(context.Context, uuid.UUID) (domain.Rubric, error)
 	List(context.Context) ([]domain.Rubric, error)
 }
 
-// A form is identified by the pair (StudentID, RubricID).
-// Reads and writes must use detached snapshots: changing a returned form must
-// not change stored state until Save succeeds.
+// Ключ формы — пара StudentID + RubricID.
+// Get возвращает независимую копию; изменения сохраняются только через Save.
 type EvaluationFormRepository interface {
-	// Create rejects an existing (StudentID, RubricID) pair with ErrAlreadyExists.
+	// Повторная пара StudentID + RubricID — ErrAlreadyExists.
 	Create(context.Context, *domain.EvaluationForm) error
 	Get(ctx context.Context, studentID, rubricID uuid.UUID) (*domain.EvaluationForm, error)
 	Save(context.Context, *domain.EvaluationForm) error
 }
 
-// StudentResult is export data, independent of CSV, JSON, or console formatting.
 type StudentResult struct {
 	StudentID   uuid.UUID
 	StudentName string

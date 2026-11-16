@@ -85,7 +85,6 @@ func (s *rubricStore) List(context.Context) ([]domain.Rubric, error) {
 	return rubrics, nil
 }
 
-// Test storage uses detached snapshots, just like a file/database adapter.
 type formKey struct {
 	studentID uuid.UUID
 	rubricID  uuid.UUID

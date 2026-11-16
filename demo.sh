@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run from any directory. Optional argument: a path to a new CSV file.
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 
 if (( $# > 1 )); then
@@ -21,8 +20,7 @@ fi
 printf 'Демонстрация: студент → рубрикатор → оценки → итог → CSV\n'
 printf 'Ожидаемый итог: 8/10 × 40 + 18/20 × 30 + 9/10 × 30 = 86 / 100\n\n'
 
-# Menu: 1 student, 3 rubric, 5 criteria, 6 form, 8 evaluation,
-# 7 view form, 9 complete, 11 final score, 12 CSV export, 0 exit.
+# Последовательность ответов для сквозного сценария через меню.
 go run ./cmd/pos <<EOF | tee "$log_path"
 1
 Иван Петров

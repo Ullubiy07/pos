@@ -39,7 +39,6 @@ func (r *RubricRepository) Add(ctx context.Context, rubric domain.Rubric) error 
 	if r.items == nil {
 		r.items = make(map[uuid.UUID]domain.Rubric)
 	}
-	// Rubric has no mutation methods and exposes criteria only as copies.
 	r.items[rubric.ID()] = rubric
 	return nil
 }

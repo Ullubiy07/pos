@@ -7,8 +7,7 @@ import (
 	"pos/internal/domain"
 )
 
-// RubricBuilder collects valid criteria without exposing an incomplete rubric.
-// A rejected step leaves previously accepted criteria unchanged.
+// Ошибка при добавлении критерия не сбрасывает уже введённые данные.
 type RubricBuilder struct {
 	name     string
 	criteria []domain.Criterion

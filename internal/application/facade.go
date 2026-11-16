@@ -9,8 +9,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Facade is the CLI's entry point to application scenarios. Services retain
-// orchestration and domain rules remain in Domain.
 type Facade struct {
 	students *StudentService
 	rubrics  *RubricService

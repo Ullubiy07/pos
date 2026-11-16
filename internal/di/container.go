@@ -1,4 +1,3 @@
-// Package di binds application ports to adapters and owns their lifetime.
 package di
 
 import (
@@ -12,9 +11,7 @@ import (
 	"pos/internal/infrastructure/memory"
 )
 
-// Container is a typed DI container. Providers create one instance per container
-// on first use. Dependencies are explicit; no global registry or reflection is used.
-// The container is accessed only at the composition root, never by domain or use cases.
+// Зависимости создаются при первом обращении и живут до конца работы контейнера.
 type Container struct {
 	students func() application.StudentRepository
 	rubrics  func() application.RubricRepository
@@ -72,7 +69,6 @@ func (c *Container) ResultService() *application.ResultService { return c.result
 
 func (c *Container) Facade() *application.Facade { return c.facade() }
 
-// CLI creates a session with its own input/output and the container's shared services.
 func (c *Container) CLI(input io.Reader, output io.Writer) *cli.App {
 	return cli.New(input, output, c.Facade())
 }

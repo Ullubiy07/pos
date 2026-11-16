@@ -23,7 +23,6 @@ type CriterionInput struct {
 	Weight   int
 }
 
-// Create receives all criteria collected by the UI and saves one valid rubric.
 func (s *RubricService) Create(ctx context.Context, name string, inputs []CriterionInput) (domain.Rubric, error) {
 	builder, err := NewRubricBuilder(name)
 	if err != nil {
