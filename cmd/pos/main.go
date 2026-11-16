@@ -5,23 +5,12 @@ import (
 	"fmt"
 	"os"
 
-	"pos/internal/cli"
-	"pos/internal/application"
-	"pos/internal/domain"
-	"pos/internal/infrastructure/csvexport"
-	"pos/internal/infrastructure/memory"
+	"pos/internal/di"
 )
 
 func main() {
-	students := memory.NewStudentRepository()
-	rubrics := memory.NewRubricRepository()
-	forms := memory.NewEvaluationFormRepository()
-	app := cli.New(os.Stdin, os.Stdout,
-		application.NewStudentService(students),
-		application.NewRubricService(rubrics),
-		application.NewEvaluationFormService(students, rubrics, forms),
-		application.NewResultService(students, forms, domain.NewEvaluationService(), csvexport.NewResultExporter()),
-	)
+	container := di.New()
+	app := container.CLI(os.Stdin, os.Stdout)
 	if err := app.Run(context.Background()); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

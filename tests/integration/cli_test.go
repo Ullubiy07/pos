@@ -12,21 +12,12 @@ import (
 
 	"pos/internal/application"
 	"pos/internal/cli"
-	"pos/internal/domain"
-	"pos/internal/infrastructure/csvexport"
-	"pos/internal/infrastructure/memory"
+	"pos/internal/di"
 )
 
 func cliFixture(input string, output *bytes.Buffer) (*cli.App, *application.RubricService) {
-	students := memory.NewStudentRepository()
-	rubrics := memory.NewRubricRepository()
-	forms := memory.NewEvaluationFormRepository()
-	rubricService := application.NewRubricService(rubrics)
-	return cli.New(strings.NewReader(input), output,
-		application.NewStudentService(students), rubricService,
-		application.NewEvaluationFormService(students, rubrics, forms),
-		application.NewResultService(students, forms, domain.NewEvaluationService(), csvexport.NewResultExporter()),
-	), rubricService
+	container := di.New()
+	return container.CLI(strings.NewReader(input), output), container.RubricService()
 }
 
 func TestCLIWorkflow(t *testing.T) {
