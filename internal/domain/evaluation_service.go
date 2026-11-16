@@ -4,10 +4,12 @@ import (
 	"fmt"
 )
 
-type EvaluationService struct{}
+type EvaluationService struct {
+	policy ScorePolicy
+}
 
-func NewEvaluationService() EvaluationService {
-	return EvaluationService{}
+func NewEvaluationService(policy ScorePolicy) EvaluationService {
+	return EvaluationService{policy: policy}
 }
 
 func (s EvaluationService) Evaluate(form *EvaluationForm) (Score, error) {
@@ -16,6 +18,9 @@ func (s EvaluationService) Evaluate(form *EvaluationForm) (Score, error) {
 	}
 	if form.Status() != Completed {
 		return Score{}, fmt.Errorf("only a completed form can be evaluated")
+	}
+	if s.policy == nil {
+		return Score{}, fmt.Errorf("final score policy must not be nil")
 	}
 
 	var total float64
@@ -26,5 +31,9 @@ func (s EvaluationService) Evaluate(form *EvaluationForm) (Score, error) {
 	if err != nil {
 		return Score{}, fmt.Errorf("calculate final score: %w", err)
 	}
-	return score, nil
+	result, err := s.policy.Apply(score)
+	if err != nil {
+		return Score{}, fmt.Errorf("apply final score policy: %w", err)
+	}
+	return result, nil
 }

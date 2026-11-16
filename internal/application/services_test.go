@@ -165,7 +165,7 @@ func TestApplicationEvaluationWorkflow(t *testing.T) {
 	studentService := application.NewStudentService(students)
 	rubricService := application.NewRubricService(rubrics)
 	formService := application.NewEvaluationFormService(students, rubrics, forms)
-	results := application.NewResultService(students, forms, domain.NewEvaluationService(), exporter)
+	results := application.NewResultService(students, forms, domain.NewEvaluationService(domain.ExactScorePolicy{}), exporter)
 
 	student, err := studentService.Add(ctx, " Alice ")
 	if err != nil {
@@ -311,7 +311,7 @@ func TestApplicationPreservesInfrastructureErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	exporter := &resultExporter{err: storageErr}
-	results := application.NewResultService(students, forms, domain.NewEvaluationService(), exporter)
+	results := application.NewResultService(students, forms, domain.NewEvaluationService(domain.ExactScorePolicy{}), exporter)
 	if err := results.Export(ctx, student.ID(), rubric.ID(), io.Discard); !errors.Is(err, storageErr) {
 		t.Fatalf("lost export error: %v", err)
 	}
@@ -381,7 +381,7 @@ func TestFormsUseSelectedRubric(t *testing.T) {
 		}
 	}
 	exporter := &resultExporter{}
-	results := application.NewResultService(students, forms, domain.NewEvaluationService(), exporter)
+	results := application.NewResultService(students, forms, domain.NewEvaluationService(domain.ExactScorePolicy{}), exporter)
 	for i, rubric := range []domain.Rubric{first, second} {
 		want := []float64{100, 50}[i]
 		score, err := results.Calculate(ctx, student.ID(), rubric.ID())

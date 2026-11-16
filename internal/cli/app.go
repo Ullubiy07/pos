@@ -18,20 +18,17 @@ import (
 type App struct {
 	input       *bufio.Scanner
 	output      io.Writer
-	students    *application.StudentService
-	rubrics     *application.RubricService
-	forms       *application.EvaluationFormService
-	results     *application.ResultService
+	app         *application.Facade
 	studentID   uuid.UUID
 	rubricID    uuid.UUID
 	studentName string
 	rubricName  string
 }
 
-func New(input io.Reader, output io.Writer, students *application.StudentService, rubrics *application.RubricService, forms *application.EvaluationFormService, results *application.ResultService) *App {
+func New(input io.Reader, output io.Writer, app *application.Facade) *App {
 	scanner := bufio.NewScanner(input)
 	scanner.Buffer(make([]byte, 4096), 1024*1024)
-	return &App{input: scanner, output: output, students: students, rubrics: rubrics, forms: forms, results: results}
+	return &App{input: scanner, output: output, app: app}
 }
 
 func (a *App) Run(ctx context.Context) error {
@@ -109,7 +106,7 @@ func (a *App) execute(ctx context.Context, command string) error {
 	}
 	switch command {
 	case "6":
-		if _, err := a.forms.Create(ctx, a.studentID, a.rubricID); err != nil {
+		if _, err := a.app.CreateForm(ctx, a.studentID, a.rubricID); err != nil {
 			return err
 		}
 		fmt.Fprintln(a.output, "Форма создана: Draft.")
@@ -118,17 +115,17 @@ func (a *App) execute(ctx context.Context, command string) error {
 	case "8":
 		return a.enterEvaluation(ctx)
 	case "9":
-		if err := a.forms.Complete(ctx, a.studentID, a.rubricID); err != nil {
+		if err := a.app.CompleteForm(ctx, a.studentID, a.rubricID); err != nil {
 			return err
 		}
 		fmt.Fprintln(a.output, "Форма завершена: Completed.")
 	case "10":
-		if err := a.forms.Reopen(ctx, a.studentID, a.rubricID); err != nil {
+		if err := a.app.ReopenForm(ctx, a.studentID, a.rubricID); err != nil {
 			return err
 		}
 		fmt.Fprintln(a.output, "Форма открыта: Draft.")
 	case "11":
-		score, err := a.results.Calculate(ctx, a.studentID, a.rubricID)
+		score, err := a.app.CalculateResult(ctx, a.studentID, a.rubricID)
 		if err != nil {
 			return err
 		}
@@ -144,7 +141,7 @@ func (a *App) addStudent(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	student, err := a.students.Add(ctx, name)
+	student, err := a.app.AddStudent(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -154,7 +151,7 @@ func (a *App) addStudent(ctx context.Context) error {
 }
 
 func (a *App) selectStudent(ctx context.Context) error {
-	students, err := a.students.List(ctx)
+	students, err := a.app.ListStudents(ctx)
 	if err != nil {
 		return err
 	}
@@ -184,8 +181,11 @@ func (a *App) createRubric(ctx context.Context) error {
 	if count <= 0 {
 		return fmt.Errorf("количество критериев должно быть положительным")
 	}
-	var criteria []application.CriterionInput
-	for i := 0; i < count; i++ {
+	builder, err := application.NewRubricBuilder(name)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < count; {
 		fmt.Fprintf(a.output, "Критерий %d:\n", i+1)
 		criterionName, err := a.read("Название: ")
 		if err != nil {
@@ -199,9 +199,13 @@ func (a *App) createRubric(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		criteria = append(criteria, application.CriterionInput{Name: criterionName, MaxScore: maximum, Weight: weight})
+		if err := builder.AddCriterion(application.CriterionInput{Name: criterionName, MaxScore: maximum, Weight: weight}); err != nil {
+			fmt.Fprintf(a.output, "Критерий не добавлен: %v. Повторите ввод этого критерия.\n", err)
+			continue
+		}
+		i++
 	}
-	rubric, err := a.rubrics.Create(ctx, name, criteria)
+	rubric, err := a.app.SaveRubric(ctx, builder)
 	if err != nil {
 		return err
 	}
@@ -211,7 +215,7 @@ func (a *App) createRubric(ctx context.Context) error {
 }
 
 func (a *App) selectRubric(ctx context.Context) error {
-	rubrics, err := a.rubrics.List(ctx)
+	rubrics, err := a.app.ListRubrics(ctx)
 	if err != nil {
 		return err
 	}
@@ -233,7 +237,7 @@ func (a *App) showRubric(ctx context.Context) error {
 	if a.rubricID == uuid.Nil {
 		return fmt.Errorf("сначала выберите рубрикатор")
 	}
-	rubric, err := a.rubrics.Get(ctx, a.rubricID)
+	rubric, err := a.app.GetRubric(ctx, a.rubricID)
 	if err != nil {
 		return err
 	}
@@ -244,7 +248,7 @@ func (a *App) showRubric(ctx context.Context) error {
 }
 
 func (a *App) showForm(ctx context.Context) error {
-	form, err := a.forms.Get(ctx, a.studentID, a.rubricID)
+	form, err := a.app.GetForm(ctx, a.studentID, a.rubricID)
 	if err != nil {
 		return err
 	}
@@ -268,7 +272,7 @@ func (a *App) showForm(ctx context.Context) error {
 }
 
 func (a *App) selectCriterion(ctx context.Context) (string, error) {
-	form, err := a.forms.Get(ctx, a.studentID, a.rubricID)
+	form, err := a.app.GetForm(ctx, a.studentID, a.rubricID)
 	if err != nil {
 		return "", err
 	}
@@ -288,7 +292,7 @@ func (a *App) enterEvaluation(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	form, err := a.forms.Get(ctx, a.studentID, a.rubricID)
+	form, err := a.app.GetForm(ctx, a.studentID, a.rubricID)
 	if err != nil {
 		return err
 	}
@@ -311,7 +315,7 @@ func (a *App) enterEvaluation(ctx context.Context) error {
 			fmt.Fprintln(a.output, "Оценка оставлена без изменений.")
 			return nil
 		case 2:
-			if err := a.forms.RemoveEvaluation(ctx, a.studentID, a.rubricID, criterion); err != nil {
+			if err := a.app.RemoveEvaluation(ctx, a.studentID, a.rubricID, criterion); err != nil {
 				return err
 			}
 			fmt.Fprintln(a.output, "Оценка отменена.")
@@ -326,7 +330,7 @@ func (a *App) enterEvaluation(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		err = a.forms.UpdateEvaluation(ctx, a.studentID, a.rubricID, criterion, score, comment)
+		err = a.app.UpdateEvaluation(ctx, a.studentID, a.rubricID, criterion, score, comment)
 	} else {
 		score, err = a.number("Балл: ")
 		if err != nil {
@@ -336,7 +340,7 @@ func (a *App) enterEvaluation(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		err = a.forms.AddEvaluation(ctx, a.studentID, a.rubricID, criterion, score, comment)
+		err = a.app.AddEvaluation(ctx, a.studentID, a.rubricID, criterion, score, comment)
 	}
 	if err != nil {
 		return err
@@ -346,7 +350,7 @@ func (a *App) enterEvaluation(ctx context.Context) error {
 }
 
 func (a *App) readUpdatedEvaluation(ctx context.Context, criterion string) (float64, string, error) {
-	form, err := a.forms.Get(ctx, a.studentID, a.rubricID)
+	form, err := a.app.GetForm(ctx, a.studentID, a.rubricID)
 	if err != nil {
 		return 0, "", err
 	}
@@ -381,7 +385,7 @@ func (a *App) readUpdatedEvaluation(ctx context.Context, criterion string) (floa
 }
 
 func (a *App) export(ctx context.Context) error {
-	if _, err := a.results.Calculate(ctx, a.studentID, a.rubricID); err != nil {
+	if _, err := a.app.CalculateResult(ctx, a.studentID, a.rubricID); err != nil {
 		return err
 	}
 	path, err := a.read("Путь к новому CSV-файлу: ")
@@ -392,7 +396,7 @@ func (a *App) export(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("создать CSV-файл: %w", err)
 	}
-	exportErr := a.results.Export(ctx, a.studentID, a.rubricID, file)
+	exportErr := a.app.ExportResult(ctx, a.studentID, a.rubricID, file)
 	closeErr := file.Close()
 	if err := errors.Join(exportErr, closeErr); err != nil {
 		return fmt.Errorf("сохранить CSV: %w", err)

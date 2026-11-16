@@ -20,7 +20,7 @@ func TestServicesWithMemoryRepositoriesAndCSV(t *testing.T) {
 	studentService := application.NewStudentService(students)
 	rubricService := application.NewRubricService(rubrics)
 	formService := application.NewEvaluationFormService(students, rubrics, forms)
-	results := application.NewResultService(students, forms, domain.NewEvaluationService(), csvexport.NewResultExporter())
+	results := application.NewResultService(students, forms, domain.NewEvaluationService(domain.ExactScorePolicy{}), csvexport.NewResultExporter())
 	student, err := studentService.Add(ctx, "Иван, Петров")
 	if err != nil {
 		t.Fatal(err)

@@ -176,7 +176,7 @@ func TestFinalScoreNormalizesDifferentMaxima(t *testing.T) {
 	if err := form.Complete(); err != nil {
 		t.Fatal(err)
 	}
-	result, err := domain.NewEvaluationService().Evaluate(form)
+	result, err := domain.NewEvaluationService(domain.ExactScorePolicy{}).Evaluate(form)
 	if err != nil || math.Abs(result.Value()-65) > 1e-9 {
 		t.Fatalf("got %v, %v; want 65", result.Value(), err)
 	}

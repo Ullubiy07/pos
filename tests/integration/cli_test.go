@@ -157,3 +157,47 @@ func TestCLIEditKeepsExistingValues(t *testing.T) {
 		}
 	}
 }
+
+func TestCLIRubricBuilderRetriesOnlyRejectedCriterion(t *testing.T) {
+	input := strings.Join([]string{
+		"3", "Course", "2", "Exam", "10", "40",
+		"Project", "20", "70", // exceeds the remaining weight; retry this step
+		"Project", "20", "60", "0",
+	}, "\n") + "\n"
+	var output bytes.Buffer
+	app, rubrics := cliFixture(input, &output)
+	if err := app.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	listed, err := rubrics.List(context.Background())
+	if err != nil || len(listed) != 1 || len(listed[0].Criteria()) != 2 {
+		t.Fatalf("accepted criteria lost after retry: %v", err)
+	}
+	if !strings.Contains(output.String(), "Повторите ввод этого критерия") {
+		t.Fatal("retry not explained")
+	}
+}
+
+func TestCLIRoundingMatchesExport(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "rounded.csv")
+	input := strings.Join([]string{
+		"1", "Alice", "3", "Course", "1", "Exam", "3", "100",
+		"6", "8", "1", "1", "", "9", "11", "12", path, "0",
+	}, "\n") + "\n"
+	var output bytes.Buffer
+	app, _ := cliFixture(input, &output)
+	if err := app.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "Итог: 33.33 / 100") {
+		t.Fatal("rounding policy not applied to CLI")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	records, err := csv.NewReader(bytes.NewReader(data)).ReadAll()
+	if err != nil || len(records) != 2 || records[1][4] != "33.33" {
+		t.Fatalf("CSV uses a different rounding rule: %v", err)
+	}
+}

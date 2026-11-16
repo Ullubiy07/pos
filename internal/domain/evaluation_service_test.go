@@ -3,7 +3,7 @@ package domain
 import "testing"
 
 func TestEvaluationServiceRequiresCompletedForm(t *testing.T) {
-	service := NewEvaluationService()
+	service := NewEvaluationService(ExactScorePolicy{})
 	if _, err := service.Evaluate(nil); err == nil {
 		t.Fatal("nil form accepted")
 	}
@@ -23,7 +23,7 @@ func TestEvaluationServiceRequiresCompletedForm(t *testing.T) {
 }
 
 func TestEvaluationServiceUsesCurrentFormEvaluations(t *testing.T) {
-	service := NewEvaluationService()
+	service := NewEvaluationService(ExactScorePolicy{})
 	form, first, second := formFixture(t)
 	if err := form.AddEvaluation(first); err != nil {
 		t.Fatal(err)

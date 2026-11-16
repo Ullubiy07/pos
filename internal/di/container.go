@@ -25,6 +25,7 @@ type Container struct {
 	rubricService  func() *application.RubricService
 	formService    func() *application.EvaluationFormService
 	resultService  func() *application.ResultService
+	facade         func() *application.Facade
 }
 
 func New() *Container {
@@ -51,7 +52,10 @@ func New() *Container {
 		return application.NewEvaluationFormService(c.students(), c.rubrics(), c.forms())
 	})
 	c.resultService = sync.OnceValue(func() *application.ResultService {
-		return application.NewResultService(c.students(), c.forms(), domain.NewEvaluationService(), c.exporter())
+		return application.NewResultService(c.students(), c.forms(), domain.NewEvaluationService(domain.HundredthsScorePolicy{}), c.exporter())
+	})
+	c.facade = sync.OnceValue(func() *application.Facade {
+		return application.NewFacade(c.StudentService(), c.RubricService(), c.EvaluationFormService(), c.ResultService())
 	})
 	return c
 }
@@ -66,7 +70,9 @@ func (c *Container) EvaluationFormService() *application.EvaluationFormService {
 
 func (c *Container) ResultService() *application.ResultService { return c.resultService() }
 
+func (c *Container) Facade() *application.Facade { return c.facade() }
+
 // CLI creates a session with its own input/output and the container's shared services.
 func (c *Container) CLI(input io.Reader, output io.Writer) *cli.App {
-	return cli.New(input, output, c.StudentService(), c.RubricService(), c.EvaluationFormService(), c.ResultService())
+	return cli.New(input, output, c.Facade())
 }

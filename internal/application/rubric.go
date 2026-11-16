@@ -25,19 +25,23 @@ type CriterionInput struct {
 
 // Create receives all criteria collected by the UI and saves one valid rubric.
 func (s *RubricService) Create(ctx context.Context, name string, inputs []CriterionInput) (domain.Rubric, error) {
-	criteria := make([]domain.Criterion, 0, len(inputs))
-	for _, input := range inputs {
-		maximum, err := domain.NewScore(input.MaxScore)
-		if err != nil {
-			return domain.Rubric{}, fmt.Errorf("create maximum score for %q: %w", input.Name, err)
-		}
-		criterion, err := domain.NewCriterion(input.Name, maximum, input.Weight)
-		if err != nil {
-			return domain.Rubric{}, fmt.Errorf("create criterion %q: %w", input.Name, err)
-		}
-		criteria = append(criteria, criterion)
+	builder, err := NewRubricBuilder(name)
+	if err != nil {
+		return domain.Rubric{}, err
 	}
-	rubric, err := domain.NewRubric(name, criteria)
+	for _, input := range inputs {
+		if err := builder.AddCriterion(input); err != nil {
+			return domain.Rubric{}, err
+		}
+	}
+	return s.Save(ctx, builder)
+}
+
+func (s *RubricService) Save(ctx context.Context, builder *RubricBuilder) (domain.Rubric, error) {
+	if builder == nil {
+		return domain.Rubric{}, fmt.Errorf("rubric builder must not be nil")
+	}
+	rubric, err := builder.Build()
 	if err != nil {
 		return domain.Rubric{}, fmt.Errorf("create rubric: %w", err)
 	}
