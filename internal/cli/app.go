@@ -74,12 +74,10 @@ func (a *App) menu() {
 6  — Создать форму для выбранного студента и рубрикатора
 7  — Показать форму и оценки
 8  — Выставить оценку
-9  — Исправить оценку
-10 — Отменить оценку
-11 — Завершить форму
-12 — Открыть форму для исправлений
-13 — Рассчитать итог
-14 — Экспортировать итог в CSV
+9  — Завершить форму
+10 — Открыть форму для исправлений
+11 — Рассчитать итог
+12 — Экспортировать итог в CSV
 0  — Выход`)
 }
 
@@ -102,7 +100,7 @@ func (a *App) execute(ctx context.Context, command string) error {
 		return a.selectRubric(ctx)
 	case "5":
 		return a.showRubric(ctx)
-	case "6", "7", "8", "9", "10", "11", "12", "13", "14":
+	case "6", "7", "8", "9", "10", "11", "12":
 		if a.studentID == uuid.Nil || a.rubricID == uuid.Nil {
 			return fmt.Errorf("сначала выберите студента и рубрикатор")
 		}
@@ -117,34 +115,25 @@ func (a *App) execute(ctx context.Context, command string) error {
 		fmt.Fprintln(a.output, "Форма создана: Draft.")
 	case "7":
 		return a.showForm(ctx)
-	case "8", "9":
-		return a.enterEvaluation(ctx, command == "9")
-	case "10":
-		criterion, err := a.selectCriterion(ctx)
-		if err != nil {
-			return err
-		}
-		if err := a.forms.RemoveEvaluation(ctx, a.studentID, a.rubricID, criterion); err != nil {
-			return err
-		}
-		fmt.Fprintln(a.output, "Оценка отменена.")
-	case "11":
+	case "8":
+		return a.enterEvaluation(ctx)
+	case "9":
 		if err := a.forms.Complete(ctx, a.studentID, a.rubricID); err != nil {
 			return err
 		}
 		fmt.Fprintln(a.output, "Форма завершена: Completed.")
-	case "12":
+	case "10":
 		if err := a.forms.Reopen(ctx, a.studentID, a.rubricID); err != nil {
 			return err
 		}
 		fmt.Fprintln(a.output, "Форма открыта: Draft.")
-	case "13":
+	case "11":
 		score, err := a.results.Calculate(ctx, a.studentID, a.rubricID)
 		if err != nil {
 			return err
 		}
 		fmt.Fprintf(a.output, "Итог: %g / 100\n", score.Value())
-	case "14":
+	case "12":
 		return a.export(ctx)
 	}
 	return nil
@@ -294,22 +283,59 @@ func (a *App) selectCriterion(ctx context.Context) (string, error) {
 	return criteria[index].Name(), nil
 }
 
-func (a *App) enterEvaluation(ctx context.Context, update bool) error {
+func (a *App) enterEvaluation(ctx context.Context) error {
 	criterion, err := a.selectCriterion(ctx)
 	if err != nil {
 		return err
 	}
-	score, err := a.number("Балл: ")
+	form, err := a.forms.Get(ctx, a.studentID, a.rubricID)
 	if err != nil {
 		return err
 	}
-	comment, err := a.read("Комментарий (можно оставить пустым): ")
-	if err != nil {
-		return err
+	update := false
+	for _, evaluation := range form.Evaluations() {
+		if evaluation.Criterion().Name() != criterion {
+			continue
+		}
+		fmt.Fprintf(a.output, "Уже выставлено: %g / %g; комментарий: %s\n",
+			evaluation.Score().Value(), evaluation.Criterion().MaxScore().Value(), evaluation.Comment)
+		fmt.Fprintln(a.output, "1 — Изменить\n2 — Оставить как есть\n3 — Удалить")
+		action, err := a.choose(3)
+		if err != nil {
+			return err
+		}
+		switch action {
+		case 0:
+			update = true
+		case 1:
+			fmt.Fprintln(a.output, "Оценка оставлена без изменений.")
+			return nil
+		case 2:
+			if err := a.forms.RemoveEvaluation(ctx, a.studentID, a.rubricID, criterion); err != nil {
+				return err
+			}
+			fmt.Fprintln(a.output, "Оценка отменена.")
+			return nil
+		}
+		break
 	}
+	var score float64
+	var comment string
 	if update {
+		score, comment, err = a.readUpdatedEvaluation(ctx, criterion)
+		if err != nil {
+			return err
+		}
 		err = a.forms.UpdateEvaluation(ctx, a.studentID, a.rubricID, criterion, score, comment)
 	} else {
+		score, err = a.number("Балл: ")
+		if err != nil {
+			return err
+		}
+		comment, err = a.read("Комментарий (можно оставить пустым): ")
+		if err != nil {
+			return err
+		}
 		err = a.forms.AddEvaluation(ctx, a.studentID, a.rubricID, criterion, score, comment)
 	}
 	if err != nil {
@@ -317,6 +343,41 @@ func (a *App) enterEvaluation(ctx context.Context, update bool) error {
 	}
 	fmt.Fprintln(a.output, "Оценка сохранена.")
 	return nil
+}
+
+func (a *App) readUpdatedEvaluation(ctx context.Context, criterion string) (float64, string, error) {
+	form, err := a.forms.Get(ctx, a.studentID, a.rubricID)
+	if err != nil {
+		return 0, "", err
+	}
+	for _, evaluation := range form.Evaluations() {
+		if evaluation.Criterion().Name() != criterion {
+			continue
+		}
+		text, err := a.read(fmt.Sprintf("Балл [%g] (Enter — оставить): ", evaluation.Score().Value()))
+		if err != nil {
+			return 0, "", err
+		}
+		score := evaluation.Score().Value()
+		if text != "" {
+			score, err = parseNumber(text)
+			if err != nil {
+				return 0, "", err
+			}
+		}
+		comment, err := a.read(fmt.Sprintf("Комментарий [%s] (Enter — оставить, - — очистить): ", evaluation.Comment))
+		if err != nil {
+			return 0, "", err
+		}
+		switch comment {
+		case "":
+			comment = evaluation.Comment
+		case "-":
+			comment = ""
+		}
+		return score, comment, nil
+	}
+	return 0, "", fmt.Errorf("по критерию %q ещё нет оценки; используйте команду «Выставить оценку»", criterion)
 }
 
 func (a *App) export(ctx context.Context) error {
@@ -370,6 +431,10 @@ func (a *App) number(prompt string) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
+	return parseNumber(text)
+}
+
+func parseNumber(text string) (float64, error) {
 	value, err := strconv.ParseFloat(strings.ReplaceAll(text, ",", "."), 64)
 	if err != nil {
 		return 0, fmt.Errorf("ожидалось число, получено %q", text)

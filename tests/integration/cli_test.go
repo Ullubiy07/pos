@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"pos/internal/cli"
 	"pos/internal/application"
+	"pos/internal/cli"
 	"pos/internal/domain"
 	"pos/internal/infrastructure/csvexport"
 	"pos/internal/infrastructure/memory"
@@ -37,12 +37,12 @@ func TestCLIWorkflow(t *testing.T) {
 		"3", "Course A", "2", "Exam", "100", "60", "Project", "10", "40",
 		"5", "6", "7",
 		"8", "1", "80", "Good", "8", "2", "5", "",
-		"11", "13", "14", firstPath,
-		"12", "9", "1", "100", "Corrected", "10", "2",
-		"8", "2", "10", "", "11", "13",
+		"9", "11", "12", firstPath,
+		"10", "8", "1", "1", "100", "Corrected", "8", "2", "3",
+		"8", "2", "10", "", "9", "11",
 		"3", "Course B", "1", "Exam", "20", "100",
-		"6", "8", "1", "10", "", "11", "13", "14", secondPath,
-		"4", "1", "7", "13", "2", "1", "0",
+		"6", "8", "1", "10", "", "9", "11", "12", secondPath,
+		"4", "1", "7", "11", "2", "1", "0",
 	}, "\n") + "\n"
 	var output bytes.Buffer
 	app, _ := cliFixture(script, &output)
@@ -75,12 +75,12 @@ func TestCLIWorkflow(t *testing.T) {
 
 func TestCLIRecoversFromInputErrors(t *testing.T) {
 	input := strings.Join([]string{
-		"13", "unknown", "2", "4", // selection required, unknown command, empty lists
+		"11", "unknown", "2", "4", // selection required, unknown command, empty lists
 		"1", "Alice", "2", "bad", "2", "99", "2", "1",
 		"3", "Invalid", "zero", // invalid integer
 		"3", "Course", "1", "Exam", "10", "100",
 		"6", "8", "1", "11", "", // score above maximum
-		"8", "1", "7,5", "", "11", "13", "0",
+		"8", "1", "7,5", "", "9", "11", "0",
 	}, "\n") + "\n"
 	var output bytes.Buffer
 	app, _ := cliFixture(input, &output)
@@ -117,7 +117,7 @@ func TestCLIExportDoesNotOverwriteExistingFile(t *testing.T) {
 	}
 	input := strings.Join([]string{
 		"1", "Alice", "3", "Course", "1", "Exam", "10", "100",
-		"6", "8", "1", "10", "", "11", "14", path, "0",
+		"6", "8", "1", "10", "", "9", "12", path, "0",
 	}, "\n") + "\n"
 	var output bytes.Buffer
 	app, _ := cliFixture(input, &output)
@@ -130,5 +130,39 @@ func TestCLIExportDoesNotOverwriteExistingFile(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "Ошибка:") {
 		t.Fatal("overwrite error not shown")
+	}
+}
+
+func TestCLIEditKeepsExistingValues(t *testing.T) {
+	input := strings.Join([]string{
+		"1", "Alice", "3", "Course", "1", "Exam", "10", "100",
+		"6", "8", "1", "7", "Original",
+		"8", "1", "2", "7",
+		"8", "1", "1", "", "", "7",
+		"8", "1", "1", "9", "", "7",
+		"8", "1", "1", "", "New comment", "7",
+		"8", "1", "1", "", "-", "7", "9", "11", "0",
+	}, "\n") + "\n"
+	var output bytes.Buffer
+	app, _ := cliFixture(input, &output)
+	if err := app.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	text := output.String()
+	if strings.Contains(text, "Ошибка:") {
+		t.Fatalf("unexpected error:\n%s", text)
+	}
+	for _, want := range []string{
+		"Оценка оставлена без изменений.",
+		"Балл [7]", "Балл [9]", "Комментарий [Original]", "Комментарий [New comment]",
+		"Exam: 7 / 10; вес 100%; вклад 70; комментарий: Original",
+		"Exam: 9 / 10; вес 100%; вклад 90; комментарий: Original",
+		"Exam: 9 / 10; вес 100%; вклад 90; комментарий: New comment",
+		"Exam: 9 / 10; вес 100%; вклад 90; комментарий: \n",
+		"Итог: 90 / 100",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("missing output %q", want)
+		}
 	}
 }
