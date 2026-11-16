@@ -59,14 +59,21 @@ func TestCriterionAndRubricInvariants(t *testing.T) {
 	if criterion.Name() != "exam" || criterion.Weight() != 50 || criterion.MaxScore() != max {
 		t.Fatal("unexpected criterion properties")
 	}
-	if _, err := domain.NewRubric([]domain.Criterion{criterion, criterion}); err == nil {
+	if _, err := domain.NewRubric("Course", []domain.Criterion{criterion, criterion}); err == nil {
 		t.Fatal("duplicate criteria accepted")
 	}
-	if _, err := domain.NewRubric([]domain.Criterion{criterion}); err == nil {
+	if _, err := domain.NewRubric("Course", []domain.Criterion{criterion}); err == nil {
 		t.Fatal("weights not totaling 100 accepted")
 	}
-	if _, err := domain.NewRubric([]domain.Criterion{{}}); err == nil {
+	if _, err := domain.NewRubric("Course", []domain.Criterion{{}}); err == nil {
 		t.Fatal("zero-value criterion accepted")
+	}
+	full, err := domain.NewCriterion("exam", max, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := domain.NewRubric(" \t", []domain.Criterion{full}); err == nil {
+		t.Fatal("blank rubric name accepted")
 	}
 }
 
@@ -80,7 +87,7 @@ func TestFormValidationAndRubricIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	input := []domain.Criterion{criterion}
-	rubric, err := domain.NewRubric(input)
+	rubric, err := domain.NewRubric("Course", input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +160,7 @@ func TestFinalScoreNormalizesDifferentMaxima(t *testing.T) {
 		criteria = append(criteria, criterion)
 		evaluations = append(evaluations, *evaluation)
 	}
-	rubric, err := domain.NewRubric(criteria)
+	rubric, err := domain.NewRubric("Course", criteria)
 	if err != nil {
 		t.Fatal(err)
 	}

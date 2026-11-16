@@ -20,7 +20,7 @@ func formFixture(t *testing.T) (*EvaluationForm, Evaluation, Evaluation) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rubric, err := NewRubric([]Criterion{first, second})
+	rubric, err := NewRubric("Course", []Criterion{first, second})
 	if err != nil {
 		t.Fatal(err)
 	}

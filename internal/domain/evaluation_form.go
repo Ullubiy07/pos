@@ -25,23 +25,26 @@ func NewEvaluationForm(studentID uuid.UUID, rubric Rubric) (*EvaluationForm, err
 	if studentID == uuid.Nil {
 		return nil, fmt.Errorf("student ID must not be empty")
 	}
-	validatedRubric, err := NewRubric(rubric.items)
-	if err != nil {
+	if err := rubric.validate(); err != nil {
 		return nil, fmt.Errorf("invalid form rubric: %w", err)
 	}
 	return &EvaluationForm{
 		studentID: studentID,
-		rubric:    validatedRubric,
+		rubric:    Rubric{id: rubric.id, name: rubric.name, items: rubric.Criteria()},
 		status:    Draft,
 	}, nil
 }
 
 func (f *EvaluationForm) Rubric() Rubric {
-	return Rubric{items: f.rubric.Criteria()}
+	return Rubric{id: f.rubric.id, name: f.rubric.name, items: f.rubric.Criteria()}
 }
 
 func (f *EvaluationForm) StudentID() uuid.UUID {
 	return f.studentID
+}
+
+func (f *EvaluationForm) RubricID() uuid.UUID {
+	return f.rubric.ID()
 }
 
 func (f *EvaluationForm) Status() EvaluationFormStatus {
